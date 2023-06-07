@@ -130,6 +130,8 @@ def Do_Render(self, context):
     #angle = 0
     startFrame = bpy.context.scene.frame_start
     endFrame = bpy.context.scene.frame_end
+    stepFrame = bpy.context.scene.frame_step
+    countFrame = int((endFrame - startFrame)/stepFrame)
     path = bpy.context.scene.sprite_export_path
     prefix = bpy.context.scene.sprite_prefix
     numAngles = bpy.context.scene.sprite_angles
@@ -139,18 +141,18 @@ def Do_Render(self, context):
     
     # sanity checks
     if (bpy.context.scene.sprite_framestyle == 1):
-        if ((endFrame - startFrame) > 26):
+        if (countFrame > 26):
             self.report({"WARNING"}, "Too many frames in this animation (26+). Try splitting  it into multiple.")
             return {"CANCELLED"}
     
     #iterate through frames
-    for frame in range (startFrame, (endFrame+1)):
+    for frame in range (0,countFrame):
         # Decide the frame name
         #framename = bpy.context.scene.sprite_framenames[currentFrame]
         if (bpy.context.scene.sprite_framestyle == 1):
-            framename = frame_style_letter[currentFrame]
+            framename = frame_style_letter[frame]
         if (bpy.context.scene.sprite_framestyle == 2):
-            framename = str(currentFrame) + '_'
+            framename = str(frame) + '_'
         
         for angle in range (0, numAngles):
             # Decide the angle name
@@ -176,8 +178,8 @@ def Do_Render(self, context):
             bpy.ops.transform.rotate(value=angleInc, orient_axis='Z', orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, False, True), mirror=True, use_proportional_edit=False, proportional_edit_falloff='SMOOTH', proportional_size=0.620921, use_proportional_connected=False, use_proportional_projected=False)
         
         # Go to next frame
-        bpy.context.scene.frame_current += 1
-        currentFrame += 1 # do we need this?
+        bpy.context.scene.frame_current = min(bpy.context.scene.frame_current + stepFrame,endFrame)
+        currentFrame = min(currentFrame + stepFrame,endFrame) # do we need this?
     
     # reset frame
     bpy.context.scene.frame_current = startFrame
@@ -408,6 +410,7 @@ class SpriteRenderPanel(bpy.types.Panel):
         row.label(text="Animation:")
         row.prop(scene, "frame_start")
         row.prop(scene, "frame_end")
+        row.prop(scene, "frame_step")
         
         row = layout.row(align=True)
         row.label(text="Resolution:")
