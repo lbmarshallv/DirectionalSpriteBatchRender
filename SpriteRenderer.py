@@ -149,10 +149,12 @@ def Do_Render(self, context):
             self.report({"WARNING"}, "Too many frames in this animation (26+). Try splitting  it into multiple.")
             return {"CANCELLED"}
     
+    bpy.context.scene.frame_current = startFrame
     #iterate through frames
-    for frame in range (0,countFrame):
+    for frame in range (0,countFrame+1):
         # Decide the frame name
         #framename = bpy.context.scene.sprite_framenames[currentFrame]
+        self.report({"INFO"}, "Rendering frame #" + str(bpy.context.scene.frame_current))
         if (bpy.context.scene.sprite_framestyle == 1):
             framename = frame_style_letter[frame + suffixOffset]
         if (bpy.context.scene.sprite_framestyle == 2):
@@ -183,7 +185,6 @@ def Do_Render(self, context):
         
         # Go to next frame
         bpy.context.scene.frame_current = min(bpy.context.scene.frame_current + stepFrame,endFrame)
-        currentFrame = min(currentFrame + stepFrame,endFrame) # do we need this?
     
     # reset frame
     bpy.context.scene.frame_current = startFrame
