@@ -134,6 +134,10 @@ def Do_Render(self, context):
     countFrame = int((endFrame - startFrame)/stepFrame)
     path = bpy.context.scene.sprite_export_path
     prefix = bpy.context.scene.sprite_prefix
+    suffix = bpy.context.scene.sprite_suffix
+    suffixOffset = frame_style_letter.find(suffix)
+    if(suffixOffset == -1):
+        suffixOffset = 0
     numAngles = bpy.context.scene.sprite_angles
     angleInc = (((pi * (360/numAngles))/180) * bpy.context.scene.sprite_direction) # Formula (Angle to increase = 360 / steps) then change degrees to radians
     #framename = bpy.context.scene.sprite_framenames[currentFrame]
@@ -150,7 +154,7 @@ def Do_Render(self, context):
         # Decide the frame name
         #framename = bpy.context.scene.sprite_framenames[currentFrame]
         if (bpy.context.scene.sprite_framestyle == 1):
-            framename = frame_style_letter[frame]
+            framename = frame_style_letter[frame + suffixOffset]
         if (bpy.context.scene.sprite_framestyle == 2):
             framename = str(frame) + '_'
         
@@ -364,6 +368,7 @@ class SpriteRenderPanel(bpy.types.Panel):
         
         row = layout.row()
         row.prop(context.scene, 'sprite_prefix')
+        row.prop(context.scene, 'sprite_suffix')
         
         row = layout.row()
         row.label(text="Angles to render:")
@@ -471,6 +476,10 @@ def register():
     bpy.types.Scene.sprite_prefix = bpy.props.StringProperty(
         name = 'Sprite Prefix',
         default = 'SPRI'
+    )
+    bpy.types.Scene.sprite_suffix = bpy.props.StringProperty(
+        name = 'Sprite Suffix',
+        default = 'A'
     )
     bpy.types.Scene.sprite_angles = bpy.props.IntProperty(
         name = 'Custom Angles',
