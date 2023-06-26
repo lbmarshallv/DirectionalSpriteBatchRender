@@ -17,6 +17,7 @@ bl_info = {
 import bpy
 from math import pi
 import enum
+import json
 
 # === Constants =======================================================
 frame_style_letter = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -69,7 +70,23 @@ def Set_AngleStyle_Doom16(context):
     
 def Set_AngleStyle_Simple(context):
     bpy.context.scene.sprite_anglestyle = 3
-    
+
+def Load_Batch_File(context):
+    if(bpy.context.scene.batch_file_name == '//' or bpy.context.scene.batch_file_name == ''):
+        return {}
+    try:
+        abs_path = bpy.path.abspath(bpy.context.scene.batch_file_name)
+        print("Loading batch file from " + abs_path)
+        f = open(abs_path, "r")
+        print("Loaded batch file")
+        j = json.loads(f.read())
+        f.close()   
+        return j
+    except:
+        # self.report({"WARNING"}, "Batch file could not be found or is invalid")
+        print("Batch file could not be found or is invalid")
+        return {}
+   
 def Create_RO(self, context):
     # store reference to active object
     active_object = context.active_object
@@ -125,69 +142,80 @@ def Do_Render(self, context):
         self.report({"WARNING"}, "Object 'RotationOrigin' not found.")
         return {"CANCELLED"}
     
-    # set initial values
-    currentFrame = 0
-    #angle = 0
-    startFrame = bpy.context.scene.frame_start
-    endFrame = bpy.context.scene.frame_end
-    stepFrame = bpy.context.scene.frame_step
-    countFrame = int((endFrame - startFrame)/stepFrame)
-    path = bpy.context.scene.sprite_export_path
-    prefix = bpy.context.scene.sprite_prefix
-    suffix = bpy.context.scene.sprite_suffix
-    suffixOffset = frame_style_letter.find(suffix)
-    if(suffixOffset == -1):
-        suffixOffset = 0
-    numAngles = bpy.context.scene.sprite_angles
-    angleInc = (((pi * (360/numAngles))/180) * bpy.context.scene.sprite_direction) # Formula (Angle to increase = 360 / steps) then change degrees to radians
-    #framename = bpy.context.scene.sprite_framenames[currentFrame]
-    #filename = ("%s%s%s%i" % (path, prefix, framename, angle))
-    
-    # sanity checks
-    if (bpy.context.scene.sprite_framestyle == 1):
-        if (countFrame > 26):
-            self.report({"WARNING"}, "Too many frames in this animation (26+). Try splitting  it into multiple.")
-            return {"CANCELLED"}
-    
-    bpy.context.scene.frame_current = startFrame
-    #iterate through frames
-    for frame in range (0,countFrame+1):
-        # Decide the frame name
-        #framename = bpy.context.scene.sprite_framenames[currentFrame]
-        self.report({"INFO"}, "Rendering frame #" + str(bpy.context.scene.frame_current))
-        if (bpy.context.scene.sprite_framestyle == 1):
-            framename = frame_style_letter[frame + suffixOffset]
-        if (bpy.context.scene.sprite_framestyle == 2):
-            framename = str(frame) + '_'
-        
-        for angle in range (0, numAngles):
-            # Decide the angle name
-            if (bpy.context.scene.sprite_anglestyle == 1):
-                if (numAngles != 8):
-                    self.report({"WARNING"}, "To use this angle style you must use EXACTLY 8 angles")
-                    return {"CANCELLED"}
-                angleOutput = angle_style_doom8[angle]
-            if (bpy.context.scene.sprite_anglestyle == 2):
-                if (numAngles != 16):
-                    self.report({"WARNING"}, "To use this angle style you must use EXACTLY 16 angles")
-                    return {"CANCELLED"}
-                angleOutput = angle_style_doom16[angle]
-            if (bpy.context.scene.sprite_anglestyle == 3):
-                angleOutput = str(angle + 1)
+    batch_dict = Load_Batch_File(context)
 
-            #Render this frame
-            bpy.context.scene.render.filepath = ("%s%s%s%s" % (path, prefix, framename, angleOutput))
-            #bpy.context.scene.render.filepath = ("%s%s%s%i" % (path, prefix, frame, angleOutput))
-            bpy.ops.render.render(animation=False, write_still=True)
-            
-            # Rotate the object
-            bpy.ops.transform.rotate(value=angleInc, orient_axis='Z', orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, False, True), mirror=True, use_proportional_edit=False, proportional_edit_falloff='SMOOTH', proportional_size=0.620921, use_proportional_connected=False, use_proportional_projected=False)
+    if(len(batch_dict) == 0):
+        batch_dict = [{
+        'sprite_prefix':bpy.context.scene.sprite_prefix,'sprite_suffix':bpy.context.scene.sprite_suffix,'frame_start':bpy.context.scene.frame_start,'frame_end':bpy.context.scene.frame_end,'frame_step':bpy.context.scene.frame_step}]
+    startFrame = bpy.context.scene.frame_start
+    for o in batch_dict:
+        startFrame = o['frame_start']
+        bpy.context.scene.frame_start = startFrame
+        endFrame = o['frame_end']
+        bpy.context.scene.frame_end = endFrame
+        stepFrame = o['frame_step'] if 'frame_step' in o.keys() else bpy.context.scene.frame_step
+        countFrame = min(int((endFrame - startFrame)/stepFrame),endFrame-startFrame)
+        if('label' in o.keys()):
+            print("Rendering "+ o['label'])
+        else:
+            print("Rendering")
+        print("Frame "+ str(startFrame) +" to "+ str(endFrame) + " with "+ str(countFrame+1) + " total frames")
+        path = bpy.context.scene.sprite_export_path
+        prefix = o['sprite_prefix'] if 'sprite_prefix' in o.keys() else bpy.context.scene.sprite_prefix
+        suffix = o['sprite_suffix'] if 'sprite_suffix' in o.keys() else bpy.context.scene.sprite_suffix
+        suffixOffset = frame_style_letter.find(suffix)
+        if(suffixOffset == -1):
+            suffixOffset = 0
+        numAngles = bpy.context.scene.sprite_angles
+        angleInc = (((pi * (360/numAngles))/180) * bpy.context.scene.sprite_direction) # Formula (Angle to increase = 360 / steps) then change degrees to radians
+        #framename = bpy.context.scene.sprite_framenames[currentFrame]
+        #filename = ("%s%s%s%i" % (path, prefix, framename, angle))
         
-        # Go to next frame
-        bpy.context.scene.frame_current = min(bpy.context.scene.frame_current + stepFrame,endFrame)
-    
-    # reset frame
-    bpy.context.scene.frame_current = startFrame
+        # sanity checks
+        if (bpy.context.scene.sprite_framestyle == 1):
+            if (countFrame > 26):
+                self.report({"WARNING"}, "Too many frames in this animation (26+). Try splitting  it into multiple.")
+                return {"CANCELLED"}
+        
+        bpy.context.scene.frame_current = startFrame
+        #iterate through frames
+        for frame in range (0,countFrame+1):
+            # Decide the frame name
+            #framename = bpy.context.scene.sprite_framenames[currentFrame]
+            self.report({"INFO"}, "Rendering frame #" + str(bpy.context.scene.frame_current))
+            if (bpy.context.scene.sprite_framestyle == 1):
+                framename = frame_style_letter[frame + suffixOffset]
+            if (bpy.context.scene.sprite_framestyle == 2):
+                framename = str(frame) + '_'
+            
+            for angle in range (0, numAngles):
+                # Decide the angle name
+                if (bpy.context.scene.sprite_anglestyle == 1):
+                    if (numAngles != 8):
+                        self.report({"WARNING"}, "To use this angle style you must use EXACTLY 8 angles")
+                        return {"CANCELLED"}
+                    angleOutput = angle_style_doom8[angle]
+                if (bpy.context.scene.sprite_anglestyle == 2):
+                    if (numAngles != 16):
+                        self.report({"WARNING"}, "To use this angle style you must use EXACTLY 16 angles")
+                        return {"CANCELLED"}
+                    angleOutput = angle_style_doom16[angle]
+                if (bpy.context.scene.sprite_anglestyle == 3):
+                    angleOutput = str(angle + 1)
+
+                #Render this frame
+                bpy.context.scene.render.filepath = ("%s%s%s%s" % (path, prefix, framename, angleOutput))
+                #bpy.context.scene.render.filepath = ("%s%s%s%i" % (path, prefix, frame, angleOutput))
+                bpy.ops.render.render(animation=False, write_still=True)
+                
+                # Rotate the object
+                bpy.ops.transform.rotate(value=angleInc, orient_axis='Z', orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, False, True), mirror=True, use_proportional_edit=False, proportional_edit_falloff='SMOOTH', proportional_size=0.620921, use_proportional_connected=False, use_proportional_projected=False)
+            
+            # Go to next frame
+            bpy.context.scene.frame_current = min(bpy.context.scene.frame_current + stepFrame,endFrame)
+        
+        # reset frame
+        bpy.context.scene.frame_current = startFrame
 
 
 # Create Operators
@@ -365,6 +393,8 @@ class SpriteRenderPanel(bpy.types.Panel):
         row.operator("spriterender.createsc")
         
         row = layout.row()
+        row.prop(context.scene, 'batch_file_name')
+        row = layout.row()
         row.prop(context.scene, 'sprite_export_path')
         
         row = layout.row()
@@ -505,6 +535,11 @@ def register():
     bpy.types.Scene.sprite_direction = bpy.props.IntProperty(
         name = 'Rotation Direction',
         default = 1,
+    )
+    bpy.types.Scene.batch_file_name = bpy.props.StringProperty(
+        name = 'Batch Processing File Name',
+        subtype = 'FILE_PATH',
+        default = '//'
     )
     # Classes
     for blender_class in spriterenderer_classes:
