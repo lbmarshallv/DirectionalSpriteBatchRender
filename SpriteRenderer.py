@@ -15,12 +15,13 @@ bl_info = {
 # Author:  Chronicler of Legends
 # Created: 2021
 import bpy
+import os
 from math import pi
 import enum
 import json
 
 # === Constants =======================================================
-frame_style_letter = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+frame_style_letter = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ[^]'
 frame_style_number = '1_2_3_4_5_6_7_8_...'
 angle_style_doom8 = '12345678'
 angle_style_doom16 = '192A3B4C5D6E7F8G'
@@ -143,10 +144,19 @@ def Do_Render(self, context):
         return {"CANCELLED"}
     
     batch_dict = Load_Batch_File(context)
-
+    script_output = "";
+    script_filepath = str(os.path.abspath(bpy.path.abspath(bpy.context.scene.sprite_export_path)))+"\script_output"+".zs";
+    script_file = open(script_filepath,"w")
+    
     if(len(batch_dict) == 0):
         batch_dict = [{
-        'sprite_prefix':bpy.context.scene.sprite_prefix,'sprite_suffix':bpy.context.scene.sprite_suffix,'frame_start':bpy.context.scene.frame_start,'frame_end':bpy.context.scene.frame_end,'frame_step':bpy.context.scene.frame_step}]
+        'sprite_prefix':bpy.context.scene.sprite_prefix,
+        'sprite_suffix':bpy.context.scene.sprite_suffix,
+        'frame_start':bpy.context.scene.frame_start,
+        'frame_end':bpy.context.scene.frame_end,
+        'frame_step':bpy.context.scene.frame_step,
+        'label':'animation'
+        }]
     startFrame = bpy.context.scene.frame_start
     for o in batch_dict:
         startFrame = o['frame_start']
@@ -157,10 +167,11 @@ def Do_Render(self, context):
         countFrame = min(int((endFrame - startFrame)/stepFrame),endFrame-startFrame)
         if('label' in o.keys()):
             print("Rendering "+ o['label'])
+            script_output += "\n" + o['label'] +":"
         else:
             print("Rendering")
         print("Frame "+ str(startFrame) +" to "+ str(endFrame) + " with "+ str(countFrame+1) + " total frames")
-        path = bpy.context.scene.sprite_export_path
+        export_path = bpy.context.scene.sprite_export_path
         prefix = o['sprite_prefix'] if 'sprite_prefix' in o.keys() else bpy.context.scene.sprite_prefix
         suffix = o['sprite_suffix'] if 'sprite_suffix' in o.keys() else bpy.context.scene.sprite_suffix
         suffixOffset = frame_style_letter.find(suffix)
@@ -173,10 +184,10 @@ def Do_Render(self, context):
         
         # sanity checks
         if (bpy.context.scene.sprite_framestyle == 1):
-            if (countFrame > 26):
-                self.report({"WARNING"}, "Too many frames in this animation (26+). Try splitting  it into multiple.")
+            if (countFrame > 28):
+                self.report({"WARNING"}, "Too many frames in this animation (29+). Try splitting  it into multiple.")
                 return {"CANCELLED"}
-        
+        script_output += "\n\t" + prefix + " "
         bpy.context.scene.frame_current = startFrame
         #iterate through frames
         for frame in range (0,countFrame+1):
@@ -185,6 +196,7 @@ def Do_Render(self, context):
             self.report({"INFO"}, "Rendering frame #" + str(bpy.context.scene.frame_current))
             if (bpy.context.scene.sprite_framestyle == 1):
                 framename = frame_style_letter[frame + suffixOffset]
+                script_output += framename
             if (bpy.context.scene.sprite_framestyle == 2):
                 framename = str(frame) + '_'
             
@@ -204,18 +216,26 @@ def Do_Render(self, context):
                     angleOutput = str(angle + 1)
 
                 #Render this frame
-                bpy.context.scene.render.filepath = ("%s%s%s%s" % (path, prefix, framename, angleOutput))
+                bpy.context.scene.render.filepath = ("%s%s%s%s" % (export_path, prefix, framename, angleOutput))
                 #bpy.context.scene.render.filepath = ("%s%s%s%i" % (path, prefix, frame, angleOutput))
                 bpy.ops.render.render(animation=False, write_still=True)
+                
                 
                 # Rotate the object
                 bpy.ops.transform.rotate(value=angleInc, orient_axis='Z', orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, False, True), mirror=True, use_proportional_edit=False, proportional_edit_falloff='SMOOTH', proportional_size=0.620921, use_proportional_connected=False, use_proportional_projected=False)
             
             # Go to next frame
             bpy.context.scene.frame_current = min(bpy.context.scene.frame_current + stepFrame,endFrame)
+            #bpy.ops.object.rotation_clear()
         
         # reset frame
         bpy.context.scene.frame_current = startFrame
+        # use framestep as the default tics
+        script_output += " " +  str(stepFrame) + ";"
+    print("\nEXPORTING ZSCRIPT TO "+ script_filepath +"\n")
+    print(script_output)
+    script_file.write(script_output)
+    script_file.close()
 
 
 # Create Operators
