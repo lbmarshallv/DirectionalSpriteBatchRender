@@ -189,6 +189,8 @@ def Do_Render(self, context):
                 return {"CANCELLED"}
         script_output += "\n\t" + prefix + " "
         bpy.context.scene.frame_current = startFrame
+        saved_rotation_euler = bpy.context.active_object.rotation_euler.copy()
+        saved_rotation_quaternion = bpy.context.active_object.rotation_quaternion.copy()
         #iterate through frames
         for frame in range (0,countFrame+1):
             # Decide the frame name
@@ -226,7 +228,10 @@ def Do_Render(self, context):
             
             # Go to next frame
             bpy.context.scene.frame_current = min(bpy.context.scene.frame_current + stepFrame,endFrame)
-            #bpy.ops.object.rotation_clear()
+            #reset rotation
+            bpy.context.active_object.rotation_euler = saved_rotation_euler
+            # Alternatively, if you saved quaternion rotation:
+            bpy.context.active_object.rotation_quaternion = saved_rotation_quaternion
         
         # reset frame
         bpy.context.scene.frame_current = startFrame
